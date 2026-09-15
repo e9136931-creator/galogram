@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebXR Hologram AR</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #0b0b16; /* Темно-синий фон, чтобы не было черной пустоты */
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+    <script type="module">
+        import * as THREE from './vendor/three.module.js';
+        import { ARButton } from './vendor/ARButton.js';
+
+        // 1. Инициализация сцены, камеры и рендерера
+        const scene = new THREE.Scene();
+        
+        const camera = new THREE.PerspectiveCamera(
+            75, 
+            window.innerWidth / window.innerHeight, 
+            0.01, 
+            10.0
+        );
+        camera.position.set(0, 0, 1.5); // Отодвигаем камеру назад, чтобы видеть объект в обычном режиме
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.xr.enabled = true; // Включаем поддержку WebXR
+        document.body.appendChild(renderer.domElement);
+
+        // 2. Добавляем кнопку AR (проверяем доступность WebXR в браузере)
+        if ('xr' in navigator) {
+            navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
+                if (supported) {
+                    document.body.appendChild(ARButton.createButton(renderer, { 
+                        requiredFeatures: ['hit-test'] 
+                    }));
+                } else {
+                    console.warn("Immersive AR не поддерживается этим устройством/браузером.");
+                }
+            });
+        } else {
+            console.warn("WebXR API недоступен.");
+        }
+
+        // 3. Создаем геометрию голограммы
+        const geometry = new THREE.IcosahedronGeometry(0.3, 1);
+        const material = new THREE.MeshBasicMaterial({
+            color: 0x00ffcc,
+            wireframe: true,
+            transparent: true,
+            opacity: 0.9
+        });
+        const hologram = new THREE.Mesh(geometry, material);
+
+        const coreGeometry = new THREE.SphereGeometry(0.15, 16, 16);
+        const coreMaterial = new THREE.MeshBasicMaterial({
+            color: 0x0088ff,
+            wireframe: true,
+            transparent: true,
+            opacity: 0.5
+        });
+        const core = new THREE.Mesh(coreGeometry, coreMaterial);
+        
+        const holoGroup = new THREE.Group();
+        holoGroup.add(hologram);
+        holoGroup.add(core);
+        holoGroup.position.set(0, 0, -1.0); // Позиция перед камерой
+        scene.add(holoGroup);
+
+        // 4. Обработка изменения размера окна
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // 5. Цикл анимации с использованием setAnimationLoop (требование WebXR)
+        renderer.setAnimationLoop(() => {
+            hologram.rotation.y += 0.01;
+            hologram.rotation.x += 0.005;
+            core.rotation.y -= 0.015;
+
+            renderer.render(scene, camera);
+        });
+    </script>
+</body>
+</html>
